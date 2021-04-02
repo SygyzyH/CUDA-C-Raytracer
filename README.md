@@ -18,7 +18,7 @@ a.exe
 a.exp
 a.lib
 ```
-And to run the program, run the executable.
+And to run the program, run the executable ```a.exe```, preferably in the terminal.
 Since the project is yet to be properly displayed, the resulting pixel colors will be printed in the terminal. Therefore, it is reccomended to run the program in some IDE or text editing envirment, to make sense of the output.
 The three files created can later be deleted.
 
