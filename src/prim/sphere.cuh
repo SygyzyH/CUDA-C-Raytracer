@@ -92,7 +92,7 @@ float sphereGetIntersectionCuda(sphere *sphere, float rOrg1, float rOrg2, float 
    // using the formula, get a, b, and c
    float len = vecLengthCuda(rDir1, rDir2, rDir3);
    float a = len * len;
-   float b = 2 * localOrigin1 * rDir1 + localOrigin2 * rDir2 + localOrigin3 * rDir3;
+   float b = 2 * (localOrigin1 * rDir1 + localOrigin2 * rDir2 + localOrigin3 * rDir3);
    len = vecLengthCuda(localOrigin1, localOrigin2, localOrigin3);
    float c = len * len - (sphere->radius * sphere->radius);
 
