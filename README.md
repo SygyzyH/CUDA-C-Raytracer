@@ -10,17 +10,18 @@ CPU emulation support was removed since CUDA Toolkit 6.0, therefore if the toolk
 ## Compilation and execution
 With the CUDA Toolkit installed, run the instructions in the terminal, in the same directory the project is installed:
 ```
-nvcc main.cu
+nvcc main.cu view.cpp -o view -lgdi32 -luser32 && view.exe
 ```
-This will create three files:
+This will create the file:
 ```
-a.exe
-a.exp
-a.lib
+view.exe
 ```
-And to run the program, run the executable ```a.exe```, preferably in the terminal.
-Since the project is yet to be properly displayed, the resulting pixel colors will be printed in the terminal. Therefore, it is reccomended to run the program in some IDE or text editing envirment, to make sense of the output.
-The three files created can later be deleted.
+And run it in the terminal.
+```view.exe``` can be deleted later.
+
+## Using the program
+If all the requirements are met, a new window will open, displaying the current output of the raytracer.
+To move the camera around, use the arrow keys. To move up and down, use space and control respectively.
 
 ## TODO
 This project is far from being complete. Here is a list of the features i think would be nice to have:
@@ -31,5 +32,5 @@ This project is far from being complete. Here is a list of the features i think 
 - [ ] .obj file support
 - [ ] Texturing
 - [ ] Proper loading of CUDA Runtime API DLL and error detection
-- [ ] API for C++ interface
-- [ ] C++ Windows API level display
+- [X] API for C++ interface
+- [X] C++ Windows API level display
