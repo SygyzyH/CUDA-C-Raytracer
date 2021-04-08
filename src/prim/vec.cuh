@@ -12,7 +12,6 @@ typedef struct {
 
 /*
 vec struct: represents a vector of any size.
-
 functions:
 buildVec - host & device. basic vector constructor.
 buildVecCudaCopy - host. constructs and returns a pointer to a deep copy of a vector in device memory.
@@ -32,7 +31,6 @@ vec* vec3Cross - host & device. cross product of two vectors of size 3 only.
 //////////
 __device__ __host__
 vec* buildVec(int size) {
-    // common code to both archs
     if (size < 1) {
         printf("Vector size of less than 1 is not allowed.\n");
         return NULL;
@@ -47,6 +45,12 @@ vec* buildVec(int size) {
     return newVec;
 }
 
+__device__ __host__
+void freeVec(vec *source) {
+    free(source->value);
+    free(source);
+}
+
 __host__
 vec* buildVecCudaCopy(vec *source) {
     
@@ -57,14 +61,12 @@ vec* buildVecCudaCopy(vec *source) {
     seperate the constructor to a __host__ and a __device__ implementation, but since there is no function
     overloading, this would be very confusing to program with). the plan to convert the object goes as
     follows, for any struct:
-
     - Construct a pointer in CPU memory of a dummy struct
     - Construct a pointer in GPU memory of the final struct (this will be the returned struct)
     - Construct a pointer in GPU memory to a deep copy of each element of the struct (not all elements
     need to be copied this way, only non-primitive objects and pointers).
     - Link the struct pointer in GPU to the struct pointer in CPU
     - Do a complete struct memcpy from the CPU struct to the final GPU struct
-
     By the end of the process, the struct should have been fully replecated in memory. Freeing the 
     original struct should be considered, since most uses of this function will only deal with the
     CPU copy tempereraly.

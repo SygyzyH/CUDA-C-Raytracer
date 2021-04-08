@@ -7,24 +7,21 @@
 #include "prim/vec.cuh"
 #include "settings.h"
 
-// constants
-#define M_PI 3.14159265358979323846
-
-const float fov = (float) 25 * (M_PI / 180);
-
 // globals
 // TODO: some (if not all) of these should be passed as a parameter.
 uint32_t *resMat;
 uint32_t *ans;
 size_t pitch;
 int contextSize;
+int lightSize;
 sphere **context;
+vec **lights;
 cam *camera;
 // to make it faster to change the camera, a host copy is also kept
 cam *cameraHost;
 
 __global__
-void renderer(uint32_t *resMat, size_t pitch, cam *camera, sphere **context, int contextSize) {
+void renderer(uint32_t *resMat, size_t pitch, cam *camera, sphere **context, int contextSize, vec **lights, int lightSize) {
     for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < HEIGHT; i += blockDim.y * gridDim.y) {
         uint32_t *resMatRow = (uint32_t *) ((char *) resMat + i * pitch);
         for (int j = blockIdx.x * blockDim.x + threadIdx.x; j < WIDTH; j += blockDim.x * gridDim.x) {
@@ -86,7 +83,7 @@ void RTInit() {
     cudaMallocPitch(&resMat, &pitch, WIDTH * sizeof(uint32_t), HEIGHT);
 
     // define context
-    contextSize = 1;
+    contextSize = 2;
     sphere **contextHost = (sphere **) malloc(contextSize * sizeof(sphere *));
     
     vec *spherePos1 = buildVec(3);
@@ -97,19 +94,35 @@ void RTInit() {
     spherePos2->value[0] = -0.7;
     spherePos2->value[1] = -0.1f;
     spherePos2->value[2] = 0;
-    sphere *sphereHost1 = buildSphere(1.0f, 0x00ff0000, spherePos1);
+    sphere *sphereHost1 = buildSphere(1.0f, 0x0050aaff, spherePos1);
     sphere *sphereHost2 = buildSphere(0.3f, 0x0000ff00, spherePos2);
     contextHost[0] = buildSphereCudaCopy(sphereHost1);
-    //contextHost[1] = buildSphereCudaCopy(sphereHost2);
+    contextHost[1] = buildSphereCudaCopy(sphereHost2);
 
     cudaMalloc(&context, contextSize * sizeof(sphere *));
     cudaMemcpy(context, contextHost, contextSize * sizeof(sphere *), cudaMemcpyHostToDevice);
 
-    free(spherePos1);
-    free(spherePos2);
+    freeVec(spherePos1);
+    freeVec(spherePos2);
     free(sphereHost1);
     free(sphereHost2);
     free(contextHost);
+
+    // define lighting
+    lightSize = 1;
+    vec **lightsHost = (vec **) malloc(lightSize * sizeof(vec *));
+
+    vec *lightPos1 = buildVec(3);
+    lightPos1->value[0] = 0.0f;
+    lightPos1->value[1] = 2.0f;
+    lightPos1->value[2] = 0.0f;
+    lightsHost[0] = buildVecCudaCopy(lightPos1);
+
+    cudaMalloc(&lights, lightSize * sizeof(vec *));
+    cudaMemcpy(lights, lightsHost, lightSize * sizeof(vec *), cudaMemcpyHostToDevice);
+
+    freeVec(lightPos1);
+    free(lightsHost);
 
     // define camera
     vec *upguide = buildVec(3);
@@ -121,15 +134,11 @@ void RTInit() {
     target->value[1] = 0.0f;
     target->value[2] = 0.0f;
     vec *origin = buildVec(3);
-    origin->value[0] = 0;
+    origin->value[0] = -2.0f;
     origin->value[1] = 0;
     origin->value[2] = 0;
-    cameraHost = buildCam(fov, screenRatio, upguide, target, origin);
+    cameraHost = buildCam(FOV, screenRatio, upguide, target, origin);
     camera = buildCamCudaCopy(cameraHost);
-
-    free(upguide);
-    free(target);
-    free(origin);
 }
 
 void RTCleanup() {
@@ -137,14 +146,7 @@ void RTCleanup() {
     cudaFree(resMat);
     free(ans);
     freeCamCudaCopy(camera);
-    // TODO: this can be much prettier. Add functions to free each struct
-    free(cameraHost->upg);
-    free(cameraHost->target);
-    free(cameraHost->origin);
-    free(cameraHost->forward);
-    free(cameraHost->right);
-    free(cameraHost->up);
-    free(cameraHost);
+    freeCam(cameraHost);
 
     // free context
     // make a pointer of all device pointers in host
@@ -159,19 +161,21 @@ void RTCleanup() {
 }
 
 void RTTranslateCamera(float x, float y, float z) {
-    vec *translationVector = buildVec(3);
-    translationVector->value[0] = x;
-    translationVector->value[1] = y;
-    translationVector->value[2] = z;
-    // crashes
-    camTranslate(cameraHost, translationVector);
+    camTranslate(cameraHost, x, y, z);
 
     // update device camera
+    // can be optimized, instead of creating a new instance, simply update the existing one (if its faster)
     freeCamCudaCopy(camera);
     camera = buildCamCudaCopy(cameraHost);
+}
 
-    free(translationVector->value);
-    free(translationVector);
+void RTRotateCamera(float yaw, float pitch) {
+    camRotate(cameraHost, yaw, pitch);
+
+    // update device camera
+    // can be optimized, instead of creating a new instance, simply update the existing one (if its faster)
+    freeCamCudaCopy(camera);
+    camera = buildCamCudaCopy(cameraHost);
 }
 
 uint32_t* RTEntryPoint() {
@@ -183,7 +187,7 @@ uint32_t* RTEntryPoint() {
     printf("Found compatible device: %s with compute-capability %d.%d.\n", deviceProp.name, deviceProp.major, deviceProp.minor);
 
     // call renderer
-    renderer<<<(int) (ceilf(WIDTH * HEIGHT / 512)), 512>>>(resMat, pitch, camera, context, contextSize);
+    renderer<<<(int) (ceilf(WIDTH * HEIGHT / 512)), 512>>>(resMat, pitch, camera, context, contextSize, lights, lightSize);
 
     // get back color matrix
     // TODO: this should be double - buffer swapped, so that the GPU controller can be threaded.

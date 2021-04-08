@@ -42,6 +42,11 @@ sphere* buildSphere(float radius, uint32_t color, vec *pos) {
     return newSphere;
 }
 
+void freeSphere(sphere *source) {
+    freeVec(source->pos);
+    free(source);
+}
+
 __host__
 sphere* buildSphereCudaCopy(sphere *source) {
 
@@ -68,9 +73,17 @@ sphere* buildSphereCudaCopy(sphere *source) {
 }
 
 __host__
-void freeSphereCudaCopy(sphere *sphere) {
-    cudaFree(sphere->pos);
-    cudaFree(sphere);
+void freeSphereCudaCopy(sphere *sphereDevice) {
+    // make a pointer of all device pointers in host
+    sphere *tempHostSphere = (sphere *) malloc(sizeof(sphere));
+    cudaMemcpy(tempHostSphere, sphereDevice, sizeof(sphere), cudaMemcpyDeviceToHost);
+
+    // free them
+    cudaFree(tempHostSphere->pos);
+    
+    // free structs itself
+    cudaFree(sphereDevice);
+    free(tempHostSphere);
 }
 
 __device__
@@ -111,9 +124,12 @@ float sphereGetIntersectionCuda(sphere *sphere, float rOrg1, float rOrg2, float 
     float p2 = (-b + discriminant) / (2 * a);
 
     // were only interested in the closest point of intersection, therefore, we only need to return the smallest one.
-    if (p1 < p2)
+    // were also not interested in intersections behind the origin of the ray, meaning no negative results
+    if (p1 > 0.001f && p1 < p2)
         return p1;
-    return p2;
+    else if (p2 > 0.001f)
+        return p2;
+    return INFINITY;
 }
 
 #endif

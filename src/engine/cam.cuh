@@ -27,6 +27,10 @@ void camUpdateSpecificationVectors - host. updates specification vectors.
 
 __host__
 static void camUpdateSpecificationVectors(cam *cam) {
+    freeVec(cam->forward);
+    freeVec(cam->right);
+    freeVec(cam->up);
+
     cam->forward = vecNorm(vecSub(cam->target, cam->origin));
     cam->right = vecNorm(vec3Cross(cam->upg, cam->forward));
     cam->up = vec3Cross(cam->right, cam->forward);
@@ -56,9 +60,24 @@ cam* buildCam(float FOV, float screenRatio, vec *upguide, vec *target, vec *orig
     newCam->target = target;
     newCam->origin = origin;
 
+    // these are not nesecery, but its just so it could be freed later when camUpdateSpecificationVectors is called
+    newCam->forward = buildVec(3);
+    newCam->right = buildVec(3);
+    newCam->up = buildVec(3);
+
     camUpdateSpecificationVectors(newCam);
     
     return newCam;
+}
+
+void freeCam(cam *source) {
+    freeVec(source->target);
+    freeVec(source->origin);
+    freeVec(source->upg);
+    freeVec(source->forward);
+    freeVec(source->right);
+    freeVec(source->up);
+    free(source);
 }
 
 __host__
@@ -108,21 +127,34 @@ cam* buildCamCudaCopy(cam *source) {
 }
 
 __host__
-void freeCamCudaCopy(cam *cam) {
-    cudaFree(cam->upg);
-    cudaFree(cam->target);
-    cudaFree(cam->origin);
-    cudaFree(cam->forward);
-    cudaFree(cam->right);
-    cudaFree(cam->up);
-    cudaFree(cam);
+void freeCamCudaCopy(cam *camera) {
+    // make a pointer of all device pointers in host
+    cam *tempHostCam = (cam *) malloc(sizeof(cam));
+    cudaMemcpy(tempHostCam, camera, sizeof(cam), cudaMemcpyDeviceToHost);
+
+    // free them
+    cudaFree(tempHostCam->upg);
+    cudaFree(tempHostCam->target);
+    cudaFree(tempHostCam->origin);
+    cudaFree(tempHostCam->forward);
+    cudaFree(tempHostCam->right);
+    cudaFree(tempHostCam->up);
+    
+    // free struct itself
+    free(tempHostCam);
+    cudaFree(camera);
 }
 
 __host__
 void camRotate(cam *cam, float yaw, float pitch) {
     // rotate the cameras target according to movement offsets in the screen.
     // first, translate the 2D coordinates of the screen offsets to 3D coordinates relative to camera;
-    vec *mouseTranslation3D = vecAdd(vecMulScalar(cam->right, yaw), vecMulScalar(cam->up, pitch));
+    vec *rightScale = vecMulScalar(cam->right, yaw);
+    vec *upScale = vecMulScalar(cam->up, pitch);
+    vec *mouseTranslation3D = vecAdd(rightScale, upScale);
+
+    freeVec(rightScale);
+    freeVec(upScale);
 
     // we need the direction vector local to the cameras origin instead of the world origin point, to make the
     // calculation simpler
@@ -132,16 +164,21 @@ void camRotate(cam *cam, float yaw, float pitch) {
     // been moved by the mouse translation.
     vec *relativeNewTarget = vecAdd(mouseTranslation3D, cam->forward);
 
+    freeVec(mouseTranslation3D);
+
     // make the relation between the lengths the same
     vec *potentialTarget = vecAdd(cam->origin, vecMulScalar(relativeNewTarget, (float) vecLength(localDiraction) / vecLength(relativeNewTarget)));
 
+    freeVec(localDiraction);
     // if the pitch is too big, the forward vector may move behind the cameras origin. This will cause the camera to
     // flip, making to forward vector point the other way around. After which, if the player continues rotating down
     // the forward vector will once again end up behind the origin. To solve this, limit the camera's new target to
     // never be too out of the cameras origin.
     float diff = cam->origin->value[1] - potentialTarget->value[1];
-    if (diff > -7 && diff < 7)
+    if (diff > -7 && diff < 7) {
+        freeVec(potentialTarget);
         potentialTarget = cam->target;
+    }
 
     // once the new target is guaranteed to be in range, apply the changes.
     cam->target = potentialTarget;
@@ -151,15 +188,29 @@ void camRotate(cam *cam, float yaw, float pitch) {
 }
 
 __host__
-void camTranslate(cam *cam, vec *translationVector) {
+void camTranslate(cam *cam, float x, float y, float z) {
     vec *movementVector;
-    movementVector = vecMulScalar(cam->forward, translationVector->value[0]);
-    movementVector = vecAdd(movementVector, vecMulScalar(cam->up, translationVector->value[1]));
-    movementVector = vecAdd(movementVector, vecMulScalar(cam->right, translationVector->value[2]));
+    vec *movementVector1 = vecMulScalar(cam->forward, x);
+    vec *movementVector2 = vecMulScalar(cam->up, y);
+    vec *movementVector3 = vecMulScalar(cam->right, z);
+    vec *movementVectorSum = vecAdd(movementVector1, movementVector2);
+    movementVector = vecAdd(movementVectorSum, movementVector3);
+    freeVec(movementVector1);
+    freeVec(movementVector2);
+    freeVec(movementVector3);
+    freeVec(movementVectorSum);
 
+    // save the old vectors to free them later
+    vec *pOrigin = cam->origin, *pTarget = cam->target;
+    
+    // update
     cam->origin = vecAdd(cam->origin, movementVector);
     cam->target = vecAdd(cam->target, movementVector);
-    free(movementVector);
+    
+    // free
+    freeVec(movementVector);
+    freeVec(pOrigin);
+    freeVec(pTarget);
 
     camUpdateSpecificationVectors(cam);
 }

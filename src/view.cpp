@@ -2,9 +2,12 @@
 #include <windows.h>
 #include <iostream>
 #include <inttypes.h>
+#include <string>
+#include <sstream>
 #include "settings.h"
-#include "RTAPIFunc.h"
-// to compile & execute: nvcc main.cu view.cpp -o view -lgdi32 -luser32 && view.exe
+#include "ManagerAPIFunc.h"
+#include "handler.h"
+// to compile & execute: nvcc main.cu view.cpp manager.cpp -o view -lgdi32 -luser32 && view.exe
 
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -21,14 +24,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
 
-            /*uint32_t *arr = (uint32_t *) calloc(HEIGHT * WIDTH, sizeof(uint32_t));
-            for (int x = 0; x < WIDTH; x++)
-                for (int y = 0; y < HEIGHT; y++)
-                    // we gaming 
-                    arr[y * WIDTH + x] = 127 + ((int) ((float) x / WIDTH * 256.0f) << 8) + ((int) ((float) y / HEIGHT * 256.0f) << 16);*/
-
             // call raytracer entry point
-            uint32_t *arr = RTEntryPoint();
+            // threading could remove this requirement and instead get the pointer to a buffer
+            uint32_t *arr = ManagerGetPixelData();
 
             // blit array
             HBITMAP map = CreateBitmap(WIDTH, HEIGHT, 1, 32, (void *) arr);
@@ -37,6 +35,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             SelectObject(src, map);
             BitBlt(hdc, 0, 0, WIDTH, HEIGHT, src, 0, 0, SRCCOPY);
 
+            ManagerFreePixelData();
+
             DeleteObject(map);
             DeleteDC(src);
             EndPaint(hwnd, &ps);
@@ -44,43 +44,68 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
         case WM_KEYDOWN: {
             switch (wParam) {
-                case VK_ESCAPE: {
+                case VK_ESCAPE: 
                     if (MessageBox(hwnd, _T("Are you sure you would like to quit?"), _T("CUDA RT"), MB_OKCANCEL) == IDOK) 
                         DestroyWindow(hwnd);
                     break;
-                }
-                case VK_LEFT: {
-                    RTTranslateCamera(0.0f, 0.0f, 0.1f);
-                    RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE);
+                case 'a':
+                case 'A':
+                case VK_LEFT: 
+                    activeKeys |= LEFT;
                     break;
-                }
-                case VK_RIGHT: {
-                    RTTranslateCamera(0.0f, 0.0f, -0.1f);
-                    RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE);
+                case 'd':
+                case 'D':
+                case VK_RIGHT: 
+                    activeKeys |= RIGHT;
                     break;
-                }
-                case VK_UP: {
-                    RTTranslateCamera(0.1f, 0.0f, 0.0f);
-                    RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE);
+                case 'w':
+                case 'W':
+                case VK_UP: 
+                    activeKeys |= FORWARD;
                     break;
-                }
-                case VK_DOWN: {
-                    RTTranslateCamera(-0.1f, 0.0f, -0.0f);
-                    RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE);
+                case 's':
+                case 'S':
+                case VK_DOWN: 
+                    activeKeys |= BACKWORD;
                     break;
-                }
-                case VK_SPACE: {
-                    RTTranslateCamera(0.0f, 0.1f, 0.0f);
-                    RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE);
+                case VK_SPACE: 
+                    activeKeys |= UP;
                     break;
-                }
-                case VK_CONTROL: {
-                    RTTranslateCamera(0.0f, -0.1f, 0.0f);
-                    RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE);
+                case VK_CONTROL:
+                    activeKeys |= DOWN;
                     break;
-                }
             }
             break;
+        }
+        case WM_KEYUP: {
+            switch (wParam) {
+                case 'a':
+                case 'A':
+                case VK_LEFT:
+                    activeKeys &= ~LEFT;
+                    break;
+                case 'd':
+                case 'D':
+                case VK_RIGHT:
+                    activeKeys &= ~RIGHT;
+                    break;
+                case 'w':
+                case 'W':
+                case VK_UP:
+                    activeKeys &= ~FORWARD;
+                    break;
+                case 's':
+                case 'S':
+                case VK_DOWN:
+                    activeKeys &= ~BACKWORD;
+                    break;
+                case VK_SPACE:
+                    activeKeys &= ~UP;
+                    break;
+                case VK_CONTROL:
+                    activeKeys &= ~DOWN;
+                    break; 
+            }
         }
         default:
             return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -122,8 +147,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return 0;
     }
 
-    // init the raytracer
-    RTInit();
+    // init the manager and the raytracer
+    ManagerInit();
 
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
@@ -132,10 +157,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     while(GetMessage(&Msg, NULL, 0, 0) > 0) {
         TranslateMessage(&Msg);
         DispatchMessage(&Msg);
+        // TODO: this should not be here. a threaded input handler should be used instead.
+        if (activeKeys != 0) {
+            float x = 0, y = 0, z = 0;
+            handleKeys(&x, &y, &z);
+            ManagerTranslateCamera(x, y, z);
+            // not sure which one is faster...
+            InvalidateRect(hwnd, NULL, NULL);
+            //RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE);
+        }
     }
 
-    // before leaving, cleanup memory used by the raytracer
-    RTCleanup();
+    // before leaving, cleanup memory used by the manager and raytracer
+    ManagerCleanup();
 
     return Msg.wParam;
 }
