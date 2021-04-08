@@ -10,7 +10,7 @@ CPU emulation support was removed since CUDA Toolkit 6.0, therefore if the toolk
 ## Compilation and execution
 With the CUDA Toolkit installed, run the instructions in the terminal, in the same directory the project is installed:
 ```
-nvcc main.cu view.cpp -o view -lgdi32 -luser32 && view.exe
+nvcc main.cu view.cpp manager.cpp -o view -lgdi32 -luser32 && view.exe
 ```
 This will create the file:
 ```
