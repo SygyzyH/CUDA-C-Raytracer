@@ -30,6 +30,7 @@ void ManagerInit() {
     RTThread.detach();
     buffer1 = RTEntryPoint();
     buffer2 = RTEntryPoint();
+    initialized = true;
 }
 
 void ManagerCleanup() {
@@ -39,7 +40,6 @@ void ManagerCleanup() {
 }
 
 uint32_t* ManagerGetPixelData() {
-    initialized = true;
     mutex.lock();
     if (activeBuffer == 1)
         return buffer1;
@@ -51,9 +51,14 @@ void ManagerFreePixelData() {
 }
 
 void ManagerTranslateCamera(float x, float y, float z) {
-    initialized = true;
     mutex.lock();
     RTTranslateCamera(x, y, z);
+    mutex.unlock();
+}
+
+void ManagerRotateCamera(float yaw, float pitch) {
+    mutex.lock();
+    RTRotateCamera(yaw, pitch);
     mutex.unlock();
 }
 

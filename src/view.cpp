@@ -1,5 +1,6 @@
 #include <tchar.h>
 #include <windows.h>
+#include <windowsx.h>
 #include <iostream>
 #include <inttypes.h>
 #include <string>
@@ -7,7 +8,7 @@
 #include "settings.h"
 #include "ManagerAPIFunc.h"
 #include "handler.h"
-// to compile & execute: nvcc main.cu view.cpp manager.cpp -o view -lgdi32 -luser32 && view.exe
+// to compile & execute: nvcc rtapi.cu view.cpp manager.cpp -o view -lgdi32 -luser32 && view.exe
 
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -23,14 +24,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
+            HDC src = CreateCompatibleDC(hdc);
 
-            // call raytracer entry point
-            // threading could remove this requirement and instead get the pointer to a buffer
+            // get current buffer
             uint32_t *arr = ManagerGetPixelData();
 
             // blit array
             HBITMAP map = CreateBitmap(WIDTH, HEIGHT, 1, 32, (void *) arr);
-            HDC src = CreateCompatibleDC(hdc);
 
             SelectObject(src, map);
             BitBlt(hdc, 0, 0, WIDTH, HEIGHT, src, 0, 0, SRCCOPY);
@@ -106,6 +106,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     activeKeys &= ~DOWN;
                     break; 
             }
+            break;
+        }
+        case WM_MOUSEMOVE: {
+            lastMouseX = GET_X_LPARAM(lParam);
+            lastMouseY = GET_Y_LPARAM(lParam);
+            break;
         }
         default:
             return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -139,13 +145,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // creating the Window
     hwnd = CreateWindowEx(WS_EX_CLIENTEDGE, _T("myWindowClass"), _T("CUDA Accelerated Raytracer"), 
-                          WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
+                          WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
                           CW_USEDEFAULT, CW_USEDEFAULT, WIDTH, HEIGHT, NULL, NULL, hInstance, NULL);
 
     if(hwnd == NULL) {
         MessageBox(NULL, _T("Window Creation Failed"), _T("Error"), MB_ICONEXCLAMATION | MB_OK);
         return 0;
     }
+    // TODO: clip cursor to window.
 
     // init the manager and the raytracer
     ManagerInit();
@@ -158,14 +165,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TranslateMessage(&Msg);
         DispatchMessage(&Msg);
         // TODO: this should not be here. a threaded input handler should be used instead.
-        if (activeKeys != 0) {
-            float x = 0, y = 0, z = 0;
-            handleKeys(&x, &y, &z);
-            ManagerTranslateCamera(x, y, z);
-            // not sure which one is faster...
-            InvalidateRect(hwnd, NULL, NULL);
-            //RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE);
-        }
+        if (GetActiveWindow() == hwnd)
+            if (activeKeys != 0 || lastMouseX != WIDTH / 2 || lastMouseY != HEIGHT / 2) {
+                float x = 0, y = 0, z = 0;
+                float yaw = 0, pitch = 0;
+                handleKeys(&x, &y, &z);
+                if (!handleMouseMovement(&yaw, &pitch)) {
+                    POINT pt;
+                    pt.x = WIDTH / 2;
+                    pt.y = HEIGHT / 2;
+                    ClientToScreen(hwnd, &pt);
+                    SetCursorPos(pt.x, pt.y);
+                }
+                ManagerTranslateCamera(x, y, z);
+                ManagerRotateCamera(yaw, pitch);
+                // not sure which one is faster...
+                InvalidateRect(hwnd, NULL, NULL);
+                //RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE);
+            }
     }
 
     // before leaving, cleanup memory used by the manager and raytracer

@@ -167,18 +167,20 @@ void camRotate(cam *cam, float yaw, float pitch) {
     freeVec(mouseTranslation3D);
 
     // make the relation between the lengths the same
+    // TODO: memory leak.
     vec *potentialTarget = vecAdd(cam->origin, vecMulScalar(relativeNewTarget, (float) vecLength(localDiraction) / vecLength(relativeNewTarget)));
 
     freeVec(localDiraction);
+    freeVec(relativeNewTarget);
     // if the pitch is too big, the forward vector may move behind the cameras origin. This will cause the camera to
     // flip, making to forward vector point the other way around. After which, if the player continues rotating down
     // the forward vector will once again end up behind the origin. To solve this, limit the camera's new target to
     // never be too out of the cameras origin.
+    // TODO: memory leak.
     float diff = cam->origin->value[1] - potentialTarget->value[1];
-    if (diff > -7 && diff < 7) {
-        freeVec(potentialTarget);
+    /*if (diff > -7 && diff < 7) {
         potentialTarget = cam->target;
-    }
+    }*/
 
     // once the new target is guaranteed to be in range, apply the changes.
     cam->target = potentialTarget;

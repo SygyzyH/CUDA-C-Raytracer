@@ -6,5 +6,6 @@ uint32_t* RTEntryPoint();
 void RTInit();
 void RTCleanup();
 void RTTranslateCamera(float x, float y, float z);
+void RTRotateCamera(float yaw, float pitch);
 
 #endif

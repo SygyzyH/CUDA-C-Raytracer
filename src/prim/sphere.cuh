@@ -9,6 +9,7 @@
 
 typedef struct {
     float radius;
+    float reflectivity;
     uint32_t color;
     vec *pos;
 } sphere;
@@ -25,7 +26,7 @@ vec* sphereGetNormal - device. returns sphere normal at a point.
 */
 
 __host__
-sphere* buildSphere(float radius, uint32_t color, vec *pos) {
+sphere* buildSphere(float radius, float reflectivity, uint32_t color, vec *pos) {
     if (radius <= 0) {
         printf("Sphere radius of less than or 0 is not allowed.");
         return NULL;
@@ -36,6 +37,7 @@ sphere* buildSphere(float radius, uint32_t color, vec *pos) {
     newSphere = (sphere *) malloc(sizeof(sphere));
 
     newSphere->radius = radius;
+    newSphere->reflectivity = reflectivity;
     newSphere->pos = pos;
     newSphere->color = color;
 
@@ -55,6 +57,7 @@ sphere* buildSphereCudaCopy(sphere *source) {
 
     // copy primitives
     newSphereHost->radius = source->radius;
+    newSphereHost->reflectivity = source->reflectivity;
     newSphereHost->color = source->color;
 
     // copy non-primitives
