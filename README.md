@@ -10,7 +10,7 @@ CPU emulation support was removed since CUDA Toolkit 6.0, therefore if the toolk
 ## Compilation and execution
 With the CUDA Toolkit installed, run the instructions in the terminal, in the same directory the project is installed:
 ```
-nvcc main.cu view.cpp manager.cpp -o view -lgdi32 -luser32 && view.exe
+nvcc rtapi.cu view.cpp manager.cpp -o view -lgdi32 -luser32 && view.exe
 ```
 This will create the file:
 ```
@@ -22,11 +22,14 @@ And run it in the terminal.
 ## Using the program
 If all the requirements are met, a new window will open, displaying the current output of the raytracer.
 To move the camera around, use the arrow keys. To move up and down, use space and control respectively.
+To rotate the camera, use the mouse.
+
+To quit, either close the window or press ESC and accept the prompt.
 
 ## TODO
 This project is far from being complete. Here is a list of the features i think would be nice to have:
-- [ ] Diffused lighting
-- [ ] Specular lighting
+- [X] Diffused lighting
+- [X] Specular lighting
 - [ ] Triangles
 - [ ] Polygon mesh
 - [ ] .obj file support
