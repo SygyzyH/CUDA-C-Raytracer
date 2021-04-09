@@ -123,6 +123,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     WNDCLASSEX wc;
     HWND hwnd;
     MSG Msg;
+    HICON icon = (HICON) LoadImage(NULL, _T("res/rticon.ico"), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
 
     // registering the Window Class
     wc.cbSize = sizeof(WNDCLASSEX);
@@ -131,12 +132,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     wc.cbClsExtra = 0;
     wc.cbWndExtra = 0;
     wc.hInstance = hInstance;
-    wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    wc.hIcon = icon;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
     wc.lpszMenuName = NULL;
     wc.lpszClassName = _T("myWindowClass");
-    wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
+    wc.hIconSm = icon;
 
     if(!RegisterClassEx(&wc)) {
         MessageBox(NULL, _T("Window Registration Failed"), _T("Error"), MB_ICONEXCLAMATION | MB_OK);
