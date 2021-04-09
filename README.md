@@ -1,5 +1,6 @@
 # CUDA-C-Raytracer
 A GPU accelerated raytracer written in CUDA C.
+![alt text](https://github.com/SygyzyH/CUDA-C-Raytracer/blob/main/res/Thumbnail.PNG?raw=true)
 
 ## Requirements
 - CUDA Toolkit
