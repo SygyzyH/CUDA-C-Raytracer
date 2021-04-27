@@ -31,8 +31,8 @@ To quit, either close the window or press ESC and accept the prompt.
 This project is far from being complete. Here is a list of the features i think would be nice to have:
 - [X] Diffused lighting
 - [X] Specular lighting
-- [ ] Triangles
-- [ ] Polygon mesh
+- [X] Triangles
+- [X] Polygon mesh
 - [ ] .obj file support
 - [ ] Texturing
 - [ ] Proper loading of CUDA Runtime API DLL and error detection
