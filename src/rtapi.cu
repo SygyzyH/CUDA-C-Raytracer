@@ -296,12 +296,6 @@ uint32_t* RTEntryPoint() {
     // drawing directly from the GPU would be preferrable, but would require CUDA writing to a
     // texture that is later displayed using openGL. 
     cudaMemcpy2D(ans, WIDTH * sizeof(uint32_t), resMat, pitch, WIDTH * sizeof(uint32_t), HEIGHT, cudaMemcpyDeviceToHost);
-
-    for (int i = 0; i < WIDTH * HEIGHT; i++) {
-        if (i % WIDTH == 0)
-            printf("\n");
-        printf("%d, ", ans[i]);
-    }
-
+    
     return ans;
 }
