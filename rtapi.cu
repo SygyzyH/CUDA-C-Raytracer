@@ -9,6 +9,8 @@
 #include "prim/vec.cuh"
 #include "settings.h"
 
+enum primT {SPHERE, POLY};
+
 // globals
 // TODO: some (if not all) of these should be passed as a parameter.
 uint32_t *resMat;
@@ -61,11 +63,24 @@ void renderer(uint32_t *resMat, size_t pitch, cam *camera, sphere **context, int
 
             // next, cast the ray to get the color
             float closestIntersection = INFINITY;
+            int intersectionObjectType;
+
             float intersectingSphereX = 0;
             float intersectingSphereY = 0;
             float intersectingSphereZ = 0;
             float intersectingSphereR = 0;
-            float intersectingSphereReflectivity = 0;
+
+            float intersectingPolyE1X = 0;
+            float intersectingPolyE1Y = 0;
+            float intersectingPolyE1Z = 0;
+            float intersectingPolyE2X = 0;
+            float intersectingPolyE2Y = 0;
+            float intersectingPolyE2Z = 0;
+            float intersectingPolyE3X = 0;
+            float intersectingPolyE3Y = 0;
+            float intersectingPolyE3Z = 0;
+
+            float intersectingObjectReflectivity = 0;
             uint32_t closestIntersectionC = 0;
 
             for (int i = 0; i < contextSize; i++) {
@@ -80,17 +95,29 @@ void renderer(uint32_t *resMat, size_t pitch, cam *camera, sphere **context, int
                     intersectingSphereY = context[i]->pos->value[1];
                     intersectingSphereZ = context[i]->pos->value[2];
                     intersectingSphereR = context[i]->radius;
-                    intersectingSphereReflectivity = context[i]->reflectivity;
+                    intersectingObjectReflectivity = context[i]->reflectivity;
+                    intersectionObjectType = SPHERE;
                 }
             }
 
             // TODO: this should be done preprly, saving all relavent values and applying lighting accordingly.
             for (int i = 0; i < meshSize; i++) {
-                float intersectionPointPoly = polyGetIntersectionCuda(mesh[i], rOrigin1, rOrigin2, rOrigin3, rDiraction1, rDiraction2, rDiraction3);
+                float intersectionPoint = polyGetIntersectionCuda(mesh[i], rOrigin1, rOrigin2, rOrigin3, rDiraction1, rDiraction2, rDiraction3);
                 
-                if (intersectionPointPoly < closestIntersection) {
+                if (intersectionPoint < closestIntersection) {
+                    closestIntersection = intersectionPoint;
                     closestIntersectionC = mesh[i]->color;
-                    closestIntersection = INFINITY;
+                    intersectingPolyE1X = mesh[i]->vert1->value[0];
+                    intersectingPolyE1Y = mesh[i]->vert1->value[1];
+                    intersectingPolyE1Z = mesh[i]->vert1->value[2];
+                    intersectingPolyE2X = mesh[i]->vert2->value[0];
+                    intersectingPolyE2Y = mesh[i]->vert2->value[1];
+                    intersectingPolyE2Z = mesh[i]->vert2->value[2];
+                    intersectingPolyE3X = mesh[i]->vert3->value[0];
+                    intersectingPolyE3Y = mesh[i]->vert3->value[1];
+                    intersectingPolyE3Z = mesh[i]->vert3->value[2];
+                    intersectingObjectReflectivity = mesh[i]->reflectivity;
+                    intersectionObjectType = POLY;
                 }
             }
             
@@ -113,20 +140,51 @@ void renderer(uint32_t *resMat, size_t pitch, cam *camera, sphere **context, int
                     intersectionPointToLight2 /= intersectionPointToLightL;
                     intersectionPointToLight3 /= intersectionPointToLightL;
 
-                    // now we need the normal. the normal of a sphere at any point is the point itself
-                    // but this must be localized and adjusted for radius
-                    float sphereNormal1 = (intersectionAt3DSpaceX - intersectingSphereX) / intersectingSphereR;
-                    float sphereNormal2 = (intersectionAt3DSpaceY - intersectingSphereY) / intersectingSphereR;
-                    float sphereNormal3 = (intersectionAt3DSpaceZ - intersectingSphereZ) / intersectingSphereR;
+                    // now we need the normal
+                    float primNormal1 = 0;
+                    float primNormal2 = 0;
+                    float primNormal3 = 0;
+                    
+                    // TODO: move this to the primitive header file as a function, and replace bare calculations with function calls
+                    switch (intersectionObjectType) {
+                        case SPHERE:
+                            // the normal of a sphere at any point is the point itself
+                            // but this must be localized and adjusted for radius
+                            primNormal1 = (intersectionAt3DSpaceX - intersectingSphereX) / intersectingSphereR;
+                            primNormal2 = (intersectionAt3DSpaceY - intersectingSphereY) / intersectingSphereR;
+                            primNormal3 = (intersectionAt3DSpaceZ - intersectingSphereZ) / intersectingSphereR;
+                        break;
+                        case POLY:
+                            // the normal of a triangle is the vector cross product of two edges of that triangle
+                            float v1 = intersectingPolyE2X - intersectingPolyE1X;
+                            float v2 = intersectingPolyE2Y - intersectingPolyE1Y;
+                            float v3 = intersectingPolyE2Z - intersectingPolyE1Z;
+
+                            float w1 = intersectingPolyE3X - intersectingPolyE1X;
+                            float w2 = intersectingPolyE3Y - intersectingPolyE1Y;
+                            float w3 = intersectingPolyE3Z - intersectingPolyE1Z;
+
+                            // w cross v
+                            float wCrossV1 = w2 * v3 - w3 * v2;
+                            float wCrossV2 = w3 * v1 - w1 * v3;
+                            float wCrossV3 = w1 * v2 - w2 * v1;
+
+                            float wCrossVL = vecLengthCuda(wCrossV1, wCrossV2, wCrossV3);
+
+                            primNormal1 = wCrossV1 / wCrossVL;
+                            primNormal2 = wCrossV2 / wCrossVL;
+                            primNormal3 = wCrossV3 / wCrossVL;
+                        break;
+                    }
                     // normalize 
-                    float sphereNormalL = vecLengthCuda(sphereNormal1, sphereNormal2, sphereNormal3);
-                    sphereNormal1 /= sphereNormalL;
-                    sphereNormal2 /= sphereNormalL;
-                    sphereNormal3 /= sphereNormalL;
+                    float primNormalL = vecLengthCuda(primNormal1, primNormal2, primNormal3);
+                    primNormal1 /= primNormalL;
+                    primNormal2 /= primNormalL;
+                    primNormal3 /= primNormalL;
                     
                     // TODO: check if anything is obscuring the light
                     // calculate diffused lighting
-                    float diffused = intersectionPointToLight1 * sphereNormal1 + intersectionPointToLight2 * sphereNormal2 + intersectionPointToLight3 * sphereNormal3;
+                    float diffused = intersectionPointToLight1 * primNormal1 + intersectionPointToLight2 * primNormal2 + intersectionPointToLight3 * primNormal3;
                     // clamp diffused lighting
                     diffused = max(AMBIENTILLUMINATION, min(1.0f, diffused));
                     // apply diffused lighting to color
@@ -154,16 +212,16 @@ void renderer(uint32_t *resMat, size_t pitch, cam *camera, sphere **context, int
                     lightToIntersectionPoint3 /= lightToIntersectionPointL;
                     
                     // calculate reflection vector
-                    float lightToIntersectionPointDotNorm = lightToIntersectionPoint1 * sphereNormal1 + lightToIntersectionPoint2 * sphereNormal2 + lightToIntersectionPoint3 * sphereNormal3;
+                    float lightToIntersectionPointDotNorm = lightToIntersectionPoint1 * primNormal1 + lightToIntersectionPoint2 * primNormal2 + lightToIntersectionPoint3 * primNormal3;
 
-                    float reflectionVector1 = lightToIntersectionPoint1 - 2 * sphereNormal1 * lightToIntersectionPointDotNorm;
-                    float reflectionVector2 = lightToIntersectionPoint2 - 2 * sphereNormal2 * lightToIntersectionPointDotNorm;
-                    float reflectionVector3 = lightToIntersectionPoint3 - 2 * sphereNormal3 * lightToIntersectionPointDotNorm;
+                    float reflectionVector1 = lightToIntersectionPoint1 - 2 * primNormal1 * lightToIntersectionPointDotNorm;
+                    float reflectionVector2 = lightToIntersectionPoint2 - 2 * primNormal2 * lightToIntersectionPointDotNorm;
+                    float reflectionVector3 = lightToIntersectionPoint3 - 2 * primNormal3 * lightToIntersectionPointDotNorm;
 
                     // calculate specular lighting
                     float reflectionDotCameraDir = reflectionVector1 * cameraDiraction1 + reflectionVector2 * cameraDiraction2 + reflectionVector3 * cameraDiraction3;
                     float specularScalar = max(0.0f, min(1.0f, reflectionDotCameraDir));
-                    float specular = specularScalar * specularScalar * intersectingSphereReflectivity;
+                    float specular = specularScalar * specularScalar * intersectingObjectReflectivity;
                     // apply specular lighting to color
                     closestIntersectionC = colorAdd(closestIntersectionC, (uint32_t) (specular * 255));
                 }
@@ -175,90 +233,36 @@ void renderer(uint32_t *resMat, size_t pitch, cam *camera, sphere **context, int
     }
 }
 
-void RTInit() {
+void RTInit(sphere **contextI, int contextLength, poly **meshI, int meshLength) {
     // TODO: CUDA DLL's sanity check
     // define result matricies
     ans = (uint32_t *) malloc(WIDTH * HEIGHT * sizeof(uint32_t));
     cudaMallocPitch(&resMat, &pitch, WIDTH * sizeof(uint32_t), HEIGHT);
 
-    // define mesh context
-    meshSize = 1;
-    poly **meshHost = (poly **) malloc(meshSize * sizeof(poly *));
-
-    vec *polyVert1 = buildVec(3);
-    polyVert1->value[0] = 1.0f;
-    polyVert1->value[1] = 1.0f;
-    polyVert1->value[2] = 1.0f;
-    vec *polyVert2 = buildVec(3);
-    polyVert2->value[0] = 0.0f;
-    polyVert2->value[1] = 1.0f;
-    polyVert2->value[2] = 0.0f;
-    vec *polyVert3 = buildVec(3);
-    polyVert3->value[0] = 0.0f;
-    polyVert3->value[1] = 0.0f;
-    polyVert3->value[2] = 0.0f;
-    poly *polyHost = buildPoly(polyVert1, polyVert2, polyVert3, buildColor(255, 255, 255), 0.0f);
-    meshHost[0] = buildPolyCudaCopy(polyHost);
-
-    cudaMalloc(&mesh, meshSize * sizeof(poly));
-    cudaMemcpy(mesh, meshHost, meshSize * sizeof(poly *), cudaMemcpyHostToDevice);
-
-    freeVec(polyVert1);
-    freeVec(polyVert2);
-    freeVec(polyVert3);
-    free(polyHost);
-    free(meshHost);
-
-    // define context
-    contextSize = 4;
+    // define scene context
+    contextSize = contextLength;
     sphere **contextHost = (sphere **) malloc(contextSize * sizeof(sphere *));
-    
-    vec *spherePos1 = buildVec(3);
-    spherePos1->value[0] = 2.0f;
-    spherePos1->value[1] = 0;
-    spherePos1->value[2] = 0;
-    vec *spherePos2 = buildVec(3);
-    spherePos2->value[0] = -0.7f;
-    spherePos2->value[1] = -0.1f;
-    spherePos2->value[2] = 0;
-    vec *spherePos3 = buildVec(3);
-    spherePos3->value[0] = 2.0f;
-    spherePos3->value[1] = 0;
-    spherePos3->value[2] = 1.0f;
-    vec *spherePos4 = buildVec(3);
-    spherePos4->value[0] = 0;
-    spherePos4->value[1] = 1.1f;
-    spherePos4->value[2] = -2.0f;
-    sphere *sphereHost1 = buildSphere(1.0f, 1.0f, buildColor(0, 0, 255), spherePos1);
-    sphere *sphereHost2 = buildSphere(0.3f, 1.0f, buildColor(0, 255, 0), spherePos2);
-    sphere *sphereHost3 = buildSphere(0.6f, 1.0f, buildColor(255, 0, 0), spherePos3);
-    sphere *sphereHost4 = buildSphere(0.5f, 1.0f, buildColor(127, 127, 127), spherePos4);
-    contextHost[0] = buildSphereCudaCopy(sphereHost1);
-    contextHost[1] = buildSphereCudaCopy(sphereHost2);
-    contextHost[2] = buildSphereCudaCopy(sphereHost3);
-    contextHost[3] = buildSphereCudaCopy(sphereHost4);
-
-    cudaMalloc(&context, contextSize * sizeof(sphere *));
+    for (int i = 0; i < contextSize; i++)
+        contextHost[i] = buildSphereCudaCopy(contextI[i]);
+    cudaMalloc(&context, contextSize * sizeof(sphere));
     cudaMemcpy(context, contextHost, contextSize * sizeof(sphere *), cudaMemcpyHostToDevice);
 
-    freeVec(spherePos1);
-    freeVec(spherePos2);
-    freeVec(spherePos3);
-    freeVec(spherePos4);
-    free(sphereHost1);
-    free(sphereHost2);
-    free(sphereHost3);
-    free(sphereHost4);
-    free(contextHost);
+    // define scene mesh
+    meshSize = meshLength;
+    poly **meshHost = (poly **) malloc(meshSize * sizeof(poly *));
+    for (int i = 0; i < meshSize; i++)
+        meshHost[i] = buildPolyCudaCopy(meshI[i]);
+    cudaMalloc(&mesh, meshSize * sizeof(poly));
+    cudaMemcpy(mesh, meshHost, meshSize * sizeof(poly *), cudaMemcpyHostToDevice);
 
     // define lighting
     lightSize = 1;
     vec **lightsHost = (vec **) malloc(lightSize * sizeof(vec *));
 
     vec *lightPos1 = buildVec(3);
-    lightPos1->value[0] = 0.0f;
-    lightPos1->value[1] = 2.0f;
-    lightPos1->value[2] = 0.0f;
+    lightPos1->value[0] = 0.5f;
+    lightPos1->value[1] = 0.5f;
+    lightPos1->value[2] = 0.5f;
     lightsHost[0] = buildVecCudaCopy(lightPos1);
 
     cudaMalloc(&lights, lightSize * sizeof(vec *));
@@ -345,11 +349,13 @@ uint32_t* RTEntryPoint() {
     // texture that is later displayed using openGL. 
     cudaMemcpy2D(ans, WIDTH * sizeof(uint32_t), resMat, pitch, WIDTH * sizeof(uint32_t), HEIGHT, cudaMemcpyDeviceToHost);
 
-    for (int i = 0; i < WIDTH * HEIGHT; i++) {
+    // how could i even forget about this
+    // understandably, major speed improvment
+    /*for (int i = 0; i < WIDTH * HEIGHT; i++) {
         if (i % WIDTH == 0)
             printf("\n");
         printf("%d, ", ans[i]);
-    }
+    }*/
 
     return ans;
 }

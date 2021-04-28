@@ -3,17 +3,11 @@
 #include <stdint.h>
 #include <math.h>
 #include "vec.cuh"
+#include "types.h"
 
 #ifndef POLYGON_CUH
 #define POLYGON_CUH
 
-typedef struct {
-    vec *vert1, *vert2, *vert3;
-    uint32_t color;
-    float reflectivity;
-} poly;
-
-__host__
 poly* buildPoly(vec *vert1, vec *vert2, vec *vert3, uint32_t color, float reflectivity) {
     poly *newPoly;
 
