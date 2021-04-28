@@ -33,7 +33,7 @@ This project is far from being complete. Here is a list of the features i think 
 - [X] Specular lighting
 - [X] Triangles
 - [X] Polygon mesh
-- [ ] .obj file support
+- [X] .obj file support
 - [ ] Texturing
 - [ ] Proper loading of CUDA Runtime API DLL and error detection
 - [X] API for C++ interface
