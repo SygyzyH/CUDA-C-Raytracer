@@ -3,7 +3,7 @@
 #include <cstdarg>
 #include <string>
 #include <vector>
-#include <tgmath.h>
+#include <ctgmath>
 #include "prim/types.h"
 
 #ifndef OBJPARSER_H
