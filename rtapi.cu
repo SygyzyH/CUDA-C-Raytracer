@@ -234,7 +234,13 @@ void renderer(uint32_t *resMat, size_t pitch, cam *camera, sphere **context, int
 }
 
 void RTInit(sphere **contextI, int contextLength, poly **meshI, int meshLength) {
-    // TODO: CUDA DLL's sanity check
+    // print some device infromation.
+    // TODO: failing these runtime API calls would cause the program to crash - not the best way of testing for
+    // compatible devices, but one nonetheless. see RTInit for a better solution.
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);
+    printf("Found compatible device: %s with compute-capability %d.%d.\n", deviceProp.name, deviceProp.major, deviceProp.minor);
+    
     // define result matricies
     ans = (uint32_t *) malloc(WIDTH * HEIGHT * sizeof(uint32_t));
     cudaMallocPitch(&resMat, &pitch, WIDTH * sizeof(uint32_t), HEIGHT);
@@ -333,13 +339,6 @@ void RTRotateCamera(float yaw, float pitch) {
 }
 
 uint32_t* RTEntryPoint() {
-    // print some device infromation.
-    // TODO: failing these runtime API calls would cause the program to crash - not the best way of testing for
-    // compatible devices, but one nonetheless. see RTInit for a better solution.
-    cudaDeviceProp deviceProp;
-    cudaGetDeviceProperties(&deviceProp, 0);
-    printf("Found compatible device: %s with compute-capability %d.%d.\n", deviceProp.name, deviceProp.major, deviceProp.minor);
-
     // call renderer
     renderer<<<(int) (ceilf(WIDTH * HEIGHT / 1024)), 1024>>>(resMat, pitch, camera, context, contextSize, mesh, meshSize, lights, lightSize);
 
