@@ -88,7 +88,7 @@ float sphereGetIntersectionCuda(sphere *sphere, float rOrg1, float rOrg2, float 
     the sphere is also localized, to cancel out the translation factors and make the formula a little easier to compute.
     
     the formula is:
-    a = length(ray dir)^2
+    a = length(ray dir)^2 = 1 // unit vector
     b = 2 * ray pos DOT ray dir
     c = length(ray pos)^2 - rad^2
     */
@@ -98,15 +98,13 @@ float sphereGetIntersectionCuda(sphere *sphere, float rOrg1, float rOrg2, float 
    float localOrigin3 = rOrg3 - sphere->pos->value[2];
 
    // using the formula, get a, b, and c
-   float len = vecLengthCuda(rDir1, rDir2, rDir3);
-   float a = len * len;
    float b = 2 * (localOrigin1 * rDir1 + localOrigin2 * rDir2 + localOrigin3 * rDir3);
-   len = vecLengthCuda(localOrigin1, localOrigin2, localOrigin3);
+   float len = vecLengthCuda(localOrigin1, localOrigin2, localOrigin3);
    float c = len * len - (sphere->radius * sphere->radius);
 
    // to find if an intersection even exists, we just need the discriminant; since its in the square root, if its
    // negative the function is undefined, and thus there are no common points between the ray and the sphere.
-   float discriminant = (b * b) - (4 * a * c);
+   float discriminant = (b * b) - (4 * c);
 
    // if the discriminate is negative, it has no square root and thus no solution. in that case, there is no intersection
    if (discriminant < 0)
@@ -115,8 +113,8 @@ float sphereGetIntersectionCuda(sphere *sphere, float rOrg1, float rOrg2, float 
     discriminant = sqrtf(discriminant);
 
     // there is at least one point of intersection. find it
-    float p1 = (-b - discriminant) / (2 * a);
-    float p2 = (-b + discriminant) / (2 * a);
+    float p1 = (-b - discriminant) / 2;
+    float p2 = (-b + discriminant) / 2;
 
     // were only interested in the closest point of intersection, therefore, we only need to return the smallest one.
     // were also not interested in intersections behind the origin of the ray, meaning no negative results
