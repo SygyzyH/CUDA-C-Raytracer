@@ -214,8 +214,6 @@ void camTranslate(cam *cam, float x, float y, float z) {
     freeVec(movementVector);
     freeVec(pOrigin);
     freeVec(pTarget);
-
-    camUpdateSpecificationVectors(cam);
 }
 
 #endif
