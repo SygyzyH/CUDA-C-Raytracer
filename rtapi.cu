@@ -283,11 +283,11 @@ void RTInit(sphere **contextI, int contextLength, poly **meshI, int meshLength) 
     upguide->value[1] = 1;
     upguide->value[2] = 0;
     vec *target = buildVec(3);
-    target->value[0] = 1.0f;
+    target->value[0] = 0.0f;
     target->value[1] = 0.0f;
-    target->value[2] = 0.0f;
+    target->value[2] = 1.0f;
     vec *origin = buildVec(3);
-    origin->value[0] = -2.0f;
+    origin->value[0] = 0;
     origin->value[1] = 0;
     origin->value[2] = 0;
     cameraHost = buildCam(FOV, screenRatio, upguide, target, origin);
