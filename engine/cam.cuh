@@ -32,8 +32,8 @@ static void camUpdateSpecificationVectors(cam *cam) {
     freeVec(cam->up);
 
     cam->forward = vecNorm(vecSub(cam->target, cam->origin));
-    cam->right = vecNorm(vec3Cross(cam->upg, cam->forward));
-    cam->up = vec3Cross(cam->right, cam->forward);
+    cam->right = vecNorm(vec3Cross(cam->forward, cam->upg));
+    cam->up = vec3Cross(cam->forward, cam->right);
 }
 
 __host__ 
