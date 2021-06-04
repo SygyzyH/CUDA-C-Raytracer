@@ -28,7 +28,7 @@ To rotate the camera, use the mouse.
 To quit, either close the window or press ESC and accept the prompt.
 
 ## TODO
-This project is far from being complete. Here is a list of the features i think would be nice to have:
+This project is far from being complete. Here is a list of the features I think would be nice to have:
 - [X] Diffused lighting
 - [X] Specular lighting
 - [X] Triangles
